@@ -11,18 +11,22 @@ dependencies:
   path_provider: ^2.1.4
   permission_handler: ^11.3.1
   video_player: ^2.9.1  # Add this line
+  http: ^1.1.0  # For API calls
+  flutter_dotenv: ^5.1.0  # For secure API key management
+  flutter_svg: ^2.0.10  # For SVG support
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
 flutter:
   assets:
-    
     - assets/background.jpg
+    - assets/storysparkbgimage2.png
+    - assets/storyspark_logo.png
     - assets/logo.png
     - assets/spark_a_story_button.png
     - assets/my_vault_button.png
     - assets/publish_button.png
-    - assets/signup_button.png  # New cloud login button
-    - assets/login_button.png   # New cloud login button
-    - assets/how_to_scroll.mp4  # Add your video file here
+    - assets/signup_button.png
+    - assets/login_button.png
+    - assets/how_to_scroll.mp4

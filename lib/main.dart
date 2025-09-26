@@ -1,542 +1,362 @@
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/home_screen.dart';
+import 'screens/auth_screen.dart';
+import 'screens/create_story_screen.dart';
+import 'widgets/modern_sidebar.dart';
+import 'old_main.dart' as old_main; // Import old functionality
 
-// Global list to store saved stories (temporary solution for demo purposes)
-List<String> savedStories = [];
-
-void main() {
-  runApp(const StorySparkApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Try to load .env file, but don't crash if it doesn't exist
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    print('No .env file found, continuing without environment variables');
+  }
+  
+  runApp(const ModernStorySparkApp());
 }
 
-class StorySparkApp extends StatelessWidget {
-  const StorySparkApp({super.key});
+class ModernStorySparkApp extends StatelessWidget {
+  const ModernStorySparkApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'StorySpark',
       theme: ThemeData(
-        primarySwatch: Colors.purple,
+        brightness: Brightness.dark,
+        primarySwatch: MaterialColor(0xFF6366F1, {
+          50: const Color(0xFFF0F4FF),
+          100: const Color(0xFFE0E7FF),
+          200: const Color(0xFFD1D5FF),
+          300: const Color(0xFFA5B4FC),
+          400: const Color(0xFF818CF8),
+          500: const Color(0xFF6366F1),
+          600: const Color(0xFF4F46E5),
+          700: const Color(0xFF4338CA),
+          800: const Color(0xFF3730A3),
+          900: const Color(0xFF312E81),
+        }),
+        scaffoldBackgroundColor: const Color(0xFF0F0F23),
+        fontFamily: 'SF Pro Display',
       ),
-      home: const HomeScreen(),
+      home: const MainLayout(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class MainLayout extends StatefulWidget {
+  const MainLayout({Key? key}) : super(key: key);
 
-  void _showStorySelectionDialog(BuildContext context) {
-    if (savedStories.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No stories saved yet!')),
-      );
-      return;
-    }
+  @override
+  _MainLayoutState createState() => _MainLayoutState();
+}
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Select a Story to Publish'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: savedStories.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(
-                    savedStories[index].substring(0, 30) + '...',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PublishScreen(story: savedStories[index]),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
+class _MainLayoutState extends State<MainLayout> {
+  String currentRoute = 'home';
+  bool isSidebarCollapsed = false;
+
+  void _handleNavigation(String route) {
+    setState(() {
+      currentRoute = route;
+    });
+  }
+
+  void _toggleSidebar() {
+    setState(() {
+      isSidebarCollapsed = !isSidebarCollapsed;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            GestureDetector(
-              onTap: () {
-                print('Sign Up clicked');
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0), // Reduced horizontal padding
-                child: Image.asset(
-                  'assets/signup_button.png',
-                  width: 500,
-                  height: 50,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Text(
-                      'Sign Up Button Missing',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    );
-                  },
-                ),
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                print('Log In clicked');
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0), // Reduced horizontal padding
-                child: Image.asset(
-                  'assets/login_button.png',
-                  width: 500, // Increased size to match "SIGN UP"
-                  height: 50,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Text(
-                      'Log In Button Missing',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: Stack(
+      body: Row(
         children: [
-          // Background image
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            child: Image.asset(
-              'assets/background.jpg',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Colors.purple,
-                  child: const Center(
-                    child: Text(
-                      'Background Missing',
-                      style: TextStyle(color: Colors.white, fontSize: 20),
-                    ),
-                  ),
-                );
-              },
-            ),
+          // Modern Sidebar
+          ModernSidebar(
+            onNavigate: _handleNavigation,
+            currentRoute: currentRoute,
+            isCollapsed: isSidebarCollapsed,
+            onToggle: _toggleSidebar,
           ),
-          // Main content (cloud buttons and static image)
-          Column( // Kept as Column to prevent scrolling
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(height: 200),
-              // Buttons (using custom images with uniform size)
-              Center(
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const StoryCreationScreen()),
-                        );
-                        print('Start a New Story clicked');
-                      },
-                      child: SizedBox(
-                        width: 450,
-                        height: 300,
-                        child: Image.asset(
-                          'assets/spark_a_story_button.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Text(
-                              'Spark a Story Button Missing',
-                              style: TextStyle(color: Colors.white, fontSize: 16),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 0),
-                    Transform.translate(
-                      offset: const Offset(-15, -45),
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const StoryVaultScreen()),
-                          );
-                          print('My Story Vault clicked');
-                        },
-                        child: SizedBox(
-                          width: 295,
-                          height: 90,
-                          child: Image.asset(
-                            'assets/my_vault_button.png W`,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Text(
-                                'My Vault Button Missing',
-                                style: TextStyle(color: Colors.white, fontSize: 16),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 0),
-                    Transform.translate(
-                      offset: const Offset(-25, -110),
-                      child: GestureDetector(
-                        onTap: () => _showStorySelectionDialog(context),
-                        child: SizedBox(
-                          width: 325,
-                          height: 250,
-                          child: Image.asset(
-                            'assets/publish_button.png',
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Text(
-                                'Publish Button Missing',
-                                style: TextStyle(color: Colors.white, fontSize: 16),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20), // Space before the static image
-              // Static image of the scroll with "How To" description
-              SizedBox(
-                width: 300, // Adjust width to fit the green rectangle area
-                height: 200, // Adjust height to fit the green rectangle area
-                child: Image.asset(
-                  'assets/how_to_scroll.png', // Static image with description
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Text(
-                      'How To Image Missing',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 20), // Space at the bottom
-            ],
-          ),
-          // Logo (positioned on top)
-          Positioned(
-            top: 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Image.asset(
-                'assets/logo.png',
-                height: 300,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Text(
-                    'Logo Missing',
-                    style: TextStyle(color: Colors.white, fontSize: 20),
-                  );
-                },
-              ),
-            ),
+          // Main Content Area
+          Expanded(
+            child: _buildCurrentScreen(),
           ),
         ],
       ),
     );
   }
-}
 
-class StoryCreationScreen extends StatefulWidget {
-  const StoryCreationScreen({super.key});
-
-  @override
-  _StoryCreationScreenState createState() => _StoryCreationScreenState();
-}
-
-class _StoryCreationScreenState extends State<StoryCreationScreen> {
-  final TextEditingController _promptController = TextEditingController();
-  double _storyAI = 50.0;
-  double _imageAI = 50.0;
-  String _generatedStory = '';
-
-  void _generateStory() {
-    String prompt = _promptController.text.isEmpty
-        ? 'A default adventure'
-        : _promptController.text;
-    setState(() {
-      _generatedStory = 'Generated Story: $prompt with ${_storyAI.round()}% AI storytelling. '
-          'Once upon a time, the story unfolded magically... (Placeholder)';
-    });
-  }
-
-  void _saveStory() {
-    if (_generatedStory.isNotEmpty) {
-      setState(() {
-        savedStories.add(_generatedStory);
-        print('Saved Story: $_generatedStory');
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Story saved to My Story Vault!')),
-      );
+  Widget _buildCurrentScreen() {
+    switch (currentRoute) {
+      case 'home':
+        return const HomeScreen();
+      case 'login':
+        return const AuthScreen();
+      case 'library':
+        return const LibraryScreen();
+      case 'create':
+        return const CreateStoryScreen();
+      case 'favorites':
+        return const FavoritesScreen();
+      case 'purchases':
+        return const PurchasesScreen();
+      case 'illustrations':
+        return const IllustrationsScreen();
+      case 'videos':
+        return const VideosScreen();
+      case 'print':
+        return const PrintBooksScreen();
+      case 'editor':
+        return const StoryEditorScreen();
+      case 'tips':
+        return const WritingTipsScreen();
+      case 'premium':
+        return const PremiumPlansScreen();
+      case 'settings':
+        return const SettingsScreen();
+      case 'learn':
+        return const LearnScreen();
+      default:
+        return const HomeScreen();
     }
   }
+}
+
+// Placeholder screens that we'll implement later
+class LibraryScreen extends StatelessWidget {
+  const LibraryScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create a Story'),
-        backgroundColor: Colors.purple,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter your story idea:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            TextField(
-              controller: _promptController,
-              decoration: const InputDecoration(
-                hintText: 'e.g., A brave puppy explores a forest',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'AI Involvement:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Slider(
-              value: _storyAI,
-              min: 1,
-              max: 100,
-              divisions: 99,
-              label: 'Story AI: ${_storyAI.round()}%',
-              activeColor: Colors.purple,
-              onChanged: (value) {
-                setState(() {
-                  _storyAI = value;
-                });
-              },
-            ),
-            Slider(
-              value: _imageAI,
-              min: 1,
-              max: 100,
-              divisions: 99,
-              label: 'Image AI: ${_storyAI.round()}%',
-              activeColor: Colors.purple,
-              onChanged: (value) {
-                setState(() {
-                  _imageAI = value;
-                });
-              },
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: _generateStory,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(120, 50),
-                  ),
-                  child: const Text('Generate'),
-                ),
-                ElevatedButton(
-                  onPressed: _saveStory,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(120, 50),
-                  ),
-                  child: const Text('Save'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Generated Story:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Text(_generatedStory),
-            const SizedBox(height: 20),
-            const Text(
-              'Generated Image:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Image.asset(
-              'assets/placeholder_image.jpg',
-              height: 200,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const Text(
-                  'Placeholder Image Missing',
-                  style: TextStyle(color: Colors.red, fontSize: 16),
-                );
-              },
-            ),
-          ],
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Story Library Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
   }
 }
 
-class StoryVaultScreen extends StatelessWidget {
-  const StoryVaultScreen({super.key});
+
+
+class FavoritesScreen extends StatelessWidget {
+  const FavoritesScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Story Vault'),
-        backgroundColor: Colors.purple,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'My Favorites Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
-      body: savedStories.isEmpty
-          ? const Center(
-              child: Text(
-                'No stories saved yet!',
-                style: TextStyle(fontSize: 18),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: savedStories.length,
-              itemBuilder: (context, index) {
-                return Card(
-                  elevation: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      savedStories[index],
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-                );
-              },
-            ),
     );
   }
 }
 
-class PublishScreen extends StatelessWidget {
-  final String story;
-
-  const PublishScreen({super.key, required this.story});
-
-  Future<void> _exportAsText(BuildContext context) async {
-    if (await Permission.storage.request().isGranted) {
-      try {
-        final directory = await getApplicationDocumentsDirectory();
-        final filePath = '${directory.path}/story_${DateTime.now().millisecondsSinceEpoch}.txt';
-        final file = File(filePath);
-        await file.writeAsString(story);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Story exported to $filePath')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to export story: $e')),
-        );
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Storage permission denied')),
-      );
-    }
-  }
+class PurchasesScreen extends StatelessWidget {
+  const PurchasesScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Publish Story'),
-        backgroundColor: Colors.purple,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'My Purchases Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Your Story:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Text(
-                  story,
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  _exportAsText(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(200, 50),
-                ),
-                child: const Text('Export as Text'),
-              ),
-            ),
-          ],
+    );
+  }
+}
+
+class IllustrationsScreen extends StatelessWidget {
+  const IllustrationsScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Story Illustrations Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class VideosScreen extends StatelessWidget {
+  const VideosScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Story Videos Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PrintBooksScreen extends StatelessWidget {
+  const PrintBooksScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Print Books Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class StoryEditorScreen extends StatelessWidget {
+  const StoryEditorScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Story Editor Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class WritingTipsScreen extends StatelessWidget {
+  const WritingTipsScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Writing Tips Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PremiumPlansScreen extends StatelessWidget {
+  const PremiumPlansScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Premium Plans Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Settings Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class LearnScreen extends StatelessWidget {
+  const LearnScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0F0F23),
+      child: const Center(
+        child: Text(
+          'Learning Resources Coming Soon',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );

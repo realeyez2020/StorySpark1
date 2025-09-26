@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'story_preview_screen.dart';
+import '../services/ai_client.dart';
 
 class CreateStoryScreen extends StatefulWidget {
   const CreateStoryScreen({Key? key}) : super(key: key);
@@ -17,6 +18,9 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   String selectedStyle = 'Classic Storybook 📚';
   double aiIntervention = 0.5; // 0.0 = Less AI, 1.0 = More AI
   bool isGenerating = false;
+
+  // AI Client - using mock for now, replace with real backend URL
+  late final AiClient aiClient;
 
   final List<String> genres = [
     'Fantasy 🧙‍♀️',
@@ -56,6 +60,14 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     'Pop Art 🌈',
     'Vintage Illustration 📰',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize AI client - use MockAiClient for testing
+    // Replace with: aiClient = AiClient(baseUrl: 'https://your-backend-url.com/api');
+    aiClient = MockAiClient();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -567,7 +579,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     });
   }
 
-  void _generateStory() {
+  void _generateStory() async {
     if (_promptController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -582,14 +594,13 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
       isGenerating = true;
     });
 
-    // Simulate story generation
-    Future.delayed(const Duration(seconds: 3), () {
+    // Generate story using AI
+    try {
+      final List<StoryPage> aiPages = await _generateAIStory();
+      
       setState(() {
         isGenerating = false;
       });
-      
-      // Generate sample story pages
-      final List<StoryPage> samplePages = _generateSampleStory();
       
       // Navigate to story preview
       Navigator.push(
@@ -599,50 +610,122 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
             storyTitle: _titleController.text.isEmpty ? 'My Amazing Story' : _titleController.text,
             genre: selectedGenre,
             style: selectedStyle,
-            pages: samplePages,
+            pages: aiPages,
           ),
         ),
       );
-    });
+    } catch (e) {
+      setState(() {
+        isGenerating = false;
+      });
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚠️ Error generating story: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 
-  List<StoryPage> _generateSampleStory() {
-    // Generate sample story based on user's prompt and settings
+  Future<List<StoryPage>> _generateAIStory() async {
     final prompt = _promptController.text.isEmpty ? "A magical adventure" : _promptController.text;
     
-    return [
-      StoryPage(
-        pageNumber: 1,
-        text: "Once upon a time, in a land far, far away, there lived a young hero who was about to embark on the most incredible journey of their life. The sun was setting over the mystical forest, painting the sky in shades of purple and gold.",
-        imagePrompt: "$prompt, $selectedStyle style, magical forest at sunset, warm golden light, mystical atmosphere, detailed illustration",
-      ),
-      StoryPage(
-        pageNumber: 2,
-        text: "As our hero stepped into the enchanted forest, strange and wonderful creatures began to appear from behind the ancient trees. Glowing butterflies danced in the air, and friendly forest spirits whispered secrets of hidden treasures.",
-        imagePrompt: "$prompt, $selectedStyle style, enchanted forest creatures, glowing butterflies, forest spirits, magical lighting, whimsical scene",
-      ),
-      StoryPage(
-        pageNumber: 3,
-        text: "Deep in the heart of the forest, our hero discovered a magnificent crystal cave that sparkled with rainbow colors. Inside, a wise old dragon was waiting, ready to share ancient wisdom and grant a special gift.",
-        imagePrompt: "$prompt, $selectedStyle style, crystal cave interior, rainbow crystals, wise dragon, magical glow, treasure chamber",
-      ),
-      StoryPage(
-        pageNumber: 4,
-        text: "With the dragon's blessing and a magical artifact in hand, our hero felt ready to face any challenge. As they emerged from the cave, a new world of possibilities opened up before them, filled with hope and endless adventure.",
-        imagePrompt: "$prompt, $selectedStyle style, hero holding magical artifact, emerging from cave, bright sunlight, hopeful scene, adventure awaits",
-      ),
-      StoryPage(
-        pageNumber: 5,
-        text: "And so, our hero's journey continued, knowing that with courage, kindness, and a little bit of magic, any dream could come true. The end... or perhaps, just the beginning of an even greater adventure!",
-        imagePrompt: "$prompt, $selectedStyle style, hero walking towards horizon, magical world landscape, bright future, inspiring ending scene",
-      ),
+    // Create story and art bibles based on user selections
+    final storyBible = {
+      "characters": [
+        {"id": "hero", "name": "Hero", "outfit": "adventure clothing"},
+      ],
+      "setting": "magical fantasy world",
+      "theme": prompt,
+      "age_group": selectedAgeGroup,
+      "genre": selectedGenre,
+    };
+
+    final artBible = {
+      "book_meta": {
+        "render_size": "1536x1152",
+        "palette": ["purple", "gold", "emerald", "silver", "rose"],
+        "style": selectedStyle,
+      },
+      "world_baseline_setting": {
+        "locale_hint": "mystical fantasy realm with forests, caves, and magical creatures",
+      },
+    };
+
+    // Generate 5 pages of content using AI
+    final List<StoryPage> pages = [];
+    
+    for (int i = 1; i <= 5; i++) {
+      try {
+        // Generate text for this page
+        final aiText = await aiClient.generatePageText(
+          page: i,
+          idea: prompt,
+          category: selectedGenre,
+          storyBible: storyBible,
+        );
+
+        // Create scene description for image generation
+        final scene = _getSceneForPage(i, prompt);
+        
+        // Create the page
+        final page = StoryPage(
+          pageNumber: i,
+          text: aiText.lines.join('\n'),
+          imagePrompt: "$scene, $selectedStyle style, detailed illustration for children's book",
+        );
+        
+        pages.add(page);
+      } catch (e) {
+        // Fallback to mock content if AI fails
+        final fallbackPage = _getFallbackPage(i, prompt);
+        pages.add(fallbackPage);
+      }
+    }
+
+    return pages;
+  }
+
+  String _getSceneForPage(int pageNumber, String prompt) {
+    switch (pageNumber) {
+      case 1:
+        return "Opening scene: $prompt begins, magical setting introduction, warm inviting atmosphere";
+      case 2:
+        return "Adventure starts: characters meet challenges, mystical creatures appear, enchanted environment";
+      case 3:
+        return "Climax moment: $prompt reaches peak, dramatic magical scene, important discovery";
+      case 4:
+        return "Resolution: challenges overcome, wisdom gained, triumphant scene with bright lighting";
+      case 5:
+        return "Happy ending: $prompt concludes, peaceful magical landscape, hope and joy";
+      default:
+        return "$prompt, magical scene, children's book illustration";
+    }
+  }
+
+  StoryPage _getFallbackPage(int pageNumber, String prompt) {
+    final fallbackTexts = [
+      "Once upon a time, a wonderful adventure was about to begin. The magic of $prompt filled the air with excitement and wonder.",
+      "Our story continues as new discoveries await. Every step forward brings more magical surprises and delightful encounters.",
+      "The heart of our adventure reveals itself. Here, the true magic of $prompt shines brightest and most beautifully.",
+      "With wisdom and courage, our journey reaches its most important moment. The power of $prompt guides us forward.",
+      "And so our magical story comes to a wonderful end. The adventure of $prompt will be remembered forever and always."
     ];
+
+    return StoryPage(
+      pageNumber: pageNumber,
+      text: fallbackTexts[pageNumber - 1],
+      imagePrompt: "${_getSceneForPage(pageNumber, prompt)}, $selectedStyle style, detailed illustration",
+    );
   }
 
   @override
   void dispose() {
     _promptController.dispose();
     _titleController.dispose();
+    aiClient.dispose();
     super.dispose();
   }
 }

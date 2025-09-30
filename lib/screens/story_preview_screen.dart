@@ -48,7 +48,11 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
   @override
   void initState() {
     super.initState();
-    aiClient = AiClient('http://localhost:3001/api');
+    // Toggle this for local development
+  final bool useLocalBackend = false; // Set to true for local dev, false for production
+  aiClient = AiClient(useLocalBackend 
+    ? 'http://localhost:3001/api' 
+    : 'https://storyspark1-production.up.railway.app/api');
     // Auto-populate prompt with first page's imagePrompt
     if (widget.pages.isNotEmpty) {
       _promptController.text = widget.pages[0].imagePrompt;

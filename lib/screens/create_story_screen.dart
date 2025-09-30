@@ -72,8 +72,11 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   @override
   void initState() {
     super.initState();
-    // Using new Stories Proxy backend
-    aiClient = AiClient('http://localhost:3001/api');
+    // Toggle this for local development
+    final bool useLocalBackend = false; // Set to true for local dev, false for production
+    aiClient = AiClient(useLocalBackend 
+      ? 'http://localhost:3001/api' 
+      : 'https://storyspark1-production.up.railway.app/api');
   }
 
   @override

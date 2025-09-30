@@ -10,8 +10,8 @@
   "dependencies": {
     "node-fetch": "^2.7.0",
     "cors": "^2.8.5",
-    "@anthropic-ai/sdk": "^0.24.3",
-    "zod": "^3.23.8"
+    "@anthropic-ai/sdk": "^0.64.0",
+    "zod": "^3.25.76"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -30,3 +30,4 @@ flutter:
     - assets/signup_button.png
     - assets/login_button.png
     - assets/how_to_scroll.mp4
+    - assets/.env

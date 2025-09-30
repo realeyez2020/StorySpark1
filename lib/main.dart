@@ -11,7 +11,7 @@ void main() async {
   
   // Try to load .env file, but don't crash if it doesn't exist
   try {
-    await dotenv.load(fileName: ".env");
+    await dotenv.load(fileName: "assets/.env");
   } catch (e) {
     print('No .env file found, continuing without environment variables');
   }

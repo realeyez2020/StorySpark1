@@ -16,6 +16,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   String selectedAgeGroup = '5-8 years';
   String selectedLength = 'Short (5-10 pages)';
   String selectedStyle = 'Classic Storybook 📚';
+  String selectedBookFormat = 'picture-book';
   double aiIntervention = 0.5; // 0.0 = Less AI, 1.0 = More AI
   bool isGenerating = false;
 
@@ -61,12 +62,18 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     'Vintage Illustration 📰',
   ];
 
+  final Map<String, String> bookFormats = {
+    'picture-book': 'Picture Book (8.5×11) 📖',
+    'square-book': 'Square Book (8×8) ⬜',
+    'board-book': 'Board Book (6×6) 🧸',
+    'chapter-book': 'Chapter Book (6×8) 📚',
+  };
+
   @override
   void initState() {
     super.initState();
-    // Initialize AI client - use MockAiClient for testing
-    // Replace with: aiClient = AiClient(baseUrl: 'https://your-backend-url.com/api');
-    aiClient = MockAiClient();
+    // Using new Stories Proxy backend
+    aiClient = AiClient('http://localhost:3001/api');
   }
 
   @override
@@ -236,9 +243,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
 
           Row(
             children: [
-              Expanded(child: _buildDropdown('Length', selectedLength, storyLengths, (value) {
-                setState(() => selectedLength = value!);
-              })),
+              Expanded(child: _buildBookFormatDropdown()),
               const SizedBox(width: 16),
               Expanded(child: _buildDropdown('Style', selectedStyle, storyStyles, (value) {
                 setState(() => selectedStyle = value!);
@@ -343,6 +348,49 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                 );
               }).toList(),
               onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBookFormatDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Book Format',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF252542),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF3D3D5C)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: selectedBookFormat,
+              isExpanded: true,
+              dropdownColor: const Color(0xFF252542),
+              style: const TextStyle(color: Colors.white),
+              icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+              items: bookFormats.keys.map((String key) {
+                return DropdownMenuItem<String>(
+                  value: key,
+                  child: Text(bookFormats[key]!),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => selectedBookFormat = value!);
+              },
             ),
           ),
         ),
@@ -579,6 +627,44 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     });
   }
 
+  Future<Map<String, String>> _generateCharacterName(String genre) async {
+    // Generate appropriate character based on genre
+    final isGirl = DateTime.now().millisecond % 2 == 0; // Random gender
+    
+    Map<String, List<String>> namesByGenre = {
+      'Fantasy': isGirl 
+        ? ['Luna', 'Aria', 'Sage', 'Nova', 'Ivy', 'Ember', 'Wren', 'Skye']
+        : ['Finn', 'Kai', 'Orion', 'Sage', 'River', 'Atlas', 'Nova', 'Leo'],
+      'Adventure': isGirl
+        ? ['Zoe', 'Maya', 'Lily', 'Emma', 'Sophie', 'Chloe', 'Mia', 'Ava'] 
+        : ['Max', 'Leo', 'Sam', 'Jake', 'Ben', 'Cole', 'Drew', 'Ryan'],
+      'Mystery': isGirl
+        ? ['Violet', 'Ruby', 'Hazel', 'Iris', 'Pearl', 'Rose', 'Grace', 'Belle']
+        : ['Oliver', 'Henry', 'Arthur', 'Felix', 'Oscar', 'Hugo', 'Theo', 'Miles'],
+      'Science Fiction': isGirl
+        ? ['Nova', 'Luna', 'Vera', 'Ada', 'Zara', 'Sky', 'Nora', 'Iris']
+        : ['Parker', 'Quinn', 'Atlas', 'Neo', 'Zach', 'Kai', 'Ravi', 'Sage'],
+    };
+    
+    final names = namesByGenre[genre] ?? (isGirl ? ['Luna', 'Maya', 'Zoe'] : ['Sam', 'Max', 'Leo']);
+    final selectedName = names[DateTime.now().microsecond % names.length];
+    
+    final hairColors = ['brown', 'blonde', 'black', 'auburn'];
+    final hairStyle = hairColors[DateTime.now().second % hairColors.length];
+    
+    final outfits = isGirl 
+      ? ['purple dress and sneakers', 'pink hoodie and jeans', 'blue sweater and skirt', 'green jacket and pants']
+      : ['blue hoodie and jeans', 'red t-shirt and shorts', 'green sweater and pants', 'gray jacket and khakis'];
+    final selectedOutfit = outfits[DateTime.now().minute % outfits.length];
+    
+    return {
+      'name': selectedName,
+      'gender': isGirl ? 'girl' : 'boy', 
+      'hair': hairStyle,
+      'outfit': selectedOutfit,
+    };
+  }
+
   void _generateStory() async {
     if (_promptController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -590,17 +676,23 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
       return;
     }
 
-    setState(() {
-      isGenerating = true;
-    });
+    if (mounted) {
+      setState(() {
+        isGenerating = true;
+      });
+    }
 
     // Generate story using AI
     try {
-      final List<StoryPage> aiPages = await _generateAIStory();
+      final result = await _generateAIStory();
+      final List<StoryPage> aiPages = result['pages'] as List<StoryPage>;
+      final String? bookId = result['bookId'] as String?;
       
-      setState(() {
-        isGenerating = false;
-      });
+      if (mounted) {
+        setState(() {
+          isGenerating = false;
+        });
+      }
       
       // Navigate to story preview
       Navigator.push(
@@ -611,55 +703,106 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
             genre: selectedGenre,
             style: selectedStyle,
             pages: aiPages,
+            bookId: bookId,
           ),
         ),
       );
     } catch (e) {
-      setState(() {
-        isGenerating = false;
-      });
-      
-      // Show error message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('⚠️ Error generating story: $e'),
-          backgroundColor: const Color(0xFFEF4444),
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          isGenerating = false;
+        });
+        
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ Error generating story: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
     }
   }
 
-  Future<List<StoryPage>> _generateAIStory() async {
+  Future<Map<String, dynamic>> _generateAIStory() async {
     final prompt = _promptController.text.isEmpty ? "A magical adventure" : _promptController.text;
+    
+    try {
+      // Step 1: Initialize a new book session with locked character roster
+      final bookSession = await aiClient.initBook(
+        pitch: prompt,
+        styleLabel: selectedStyle,
+        genreLabel: selectedGenre,
+        ageBand: selectedAgeGroup.toLowerCase(),
+        allowAiNames: true,
+        forceRhyme: false,
+        bookSize: selectedBookFormat,
+      );
+      
+      final bookId = bookSession['book_id'] as String;
+      final storyBible = bookSession['story_bible'] as Map<String, dynamic>;
+      final artBible = bookSession['art_bible'] as Map<String, dynamic>;
+      final characterName = storyBible['characters'][0]['display_name'] as String;
+      
+      print('✅ Book session created: $bookId with character: $characterName');
+      
+      // Step 2: Generate all pages using the book session
+      final List<StoryPage> pages = [];
+      
+      for (int i = 1; i <= 5; i++) {
+        final pageResult = await aiClient.writePage(
+          bookId: bookId,
+          page: i,
+          idea: prompt,
+        );
+        
+        final page = StoryPage(
+          pageNumber: i,
+          text: (pageResult['lines'] as List<dynamic>).join('\n'),
+          imagePrompt: pageResult['scene_hint'] ?? "Children's book illustration with $characterName",
+        );
+        
+        pages.add(page);
+      }
+      
+      return {'pages': pages, 'bookId': bookId};
+    } catch (e) {
+      print('❌ Book session generation failed: $e');
+      // Fallback to old method if new system fails
+      final fallbackPages = await _generateFallbackStory();
+      return {'pages': fallbackPages, 'bookId': null};
+    }
+  }
+  
+  Future<List<StoryPage>> _generateFallbackStory() async {
+    final prompt = _promptController.text.isEmpty ? "A magical adventure" : _promptController.text;
+    
+    // Generate random character name and gender  
+    final characterNames = await _generateCharacterName(selectedGenre);
     
     // Create story and art bibles based on user selections
     final storyBible = {
       "characters": [
-        {"id": "hero", "name": "Hero", "outfit": "adventure clothing"},
+        {
+          "id": "main", 
+          "name": characterNames['name'], 
+          "gender": characterNames['gender'],
+          "description": "curious 8-year-old with ${characterNames['hair']} hair", 
+          "outfit": characterNames['outfit']
+        },
       ],
       "setting": "magical fantasy world",
       "theme": prompt,
       "age_group": selectedAgeGroup,
       "genre": selectedGenre,
+      "anti_cliche": "NEVER start with 'Once upon a time', 'In a land far away', 'Long ago', or 'There once was'",
     };
 
-    final artBible = {
-      "book_meta": {
-        "render_size": "1536x1152",
-        "palette": ["purple", "gold", "emerald", "silver", "rose"],
-        "style": selectedStyle,
-      },
-      "world_baseline_setting": {
-        "locale_hint": "mystical fantasy realm with forests, caves, and magical creatures",
-      },
-    };
-
-    // Generate 5 pages of content using AI
+    // This is only used for fallback - the main method uses book sessions above
     final List<StoryPage> pages = [];
     
     for (int i = 1; i <= 5; i++) {
       try {
-        // Generate text for this page
         final aiText = await aiClient.generatePageText(
           page: i,
           idea: prompt,
@@ -667,24 +810,19 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
           storyBible: storyBible,
         );
 
-        // Create scene description for image generation
-        final scene = _getSceneForPage(i, prompt);
-        
-        // Create the page
         final page = StoryPage(
           pageNumber: i,
           text: aiText.lines.join('\n'),
-          imagePrompt: "$scene, $selectedStyle style, detailed illustration for children's book",
+          imagePrompt: aiText.sceneHint ?? "Children's book illustration with ${characterNames['name']}",
         );
         
         pages.add(page);
       } catch (e) {
-        // Fallback to mock content if AI fails
         final fallbackPage = _getFallbackPage(i, prompt);
         pages.add(fallbackPage);
       }
     }
-
+    
     return pages;
   }
 
@@ -725,7 +863,6 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   void dispose() {
     _promptController.dispose();
     _titleController.dispose();
-    aiClient.dispose();
     super.dispose();
   }
 }

@@ -13,7 +13,6 @@ class AiClient {
     String ageBand = 'kids',
     bool allowAiNames = true,
     bool forceRhyme = false,
-    String bookSize = 'picture-book',
   }) async {
     final r = await http.post(Uri.parse('$baseUrl/book/init'),
       headers: {'content-type': 'application/json'},
@@ -24,7 +23,6 @@ class AiClient {
         'ageBand': ageBand,
         'allowAiNames': allowAiNames,
         'forceRhyme': forceRhyme,
-        'bookSize': bookSize,
       }),
     );
     if (r.statusCode >= 300) throw Exception('initBook error: ${r.body}');
@@ -58,7 +56,6 @@ class AiClient {
     required String genreLabel,
     List<Map<String, dynamic>> characters = const [],
   }) async {
-    print('🔍 renderPage called with: bookId=$bookId, page=$page, styleLabel=$styleLabel, genreLabel=$genreLabel');
     final r = await http.post(Uri.parse('$baseUrl/image'),
       headers: {'content-type': 'application/json'},
       body: jsonEncode({
@@ -70,7 +67,6 @@ class AiClient {
         'characters': characters,
       }),
     );
-    print('🔍 Backend response: ${r.statusCode} - ${r.body}');
     if (r.statusCode >= 300) throw Exception('renderPage error: ${r.body}');
     final j = jsonDecode(r.body) as Map<String, dynamic>;
     final b64 = j['image_b64'] as String;
@@ -110,11 +106,10 @@ class AiClient {
     required String userStyle,
     required String genreLabel,
     required Map<String, dynamic> artBible,
-    String? bookId,
   }) async {
-    // Use provided bookId or fall back to legacy
+    // Legacy wrapper
     return renderPage(
-      bookId: bookId ?? 'legacy',
+      bookId: 'legacy',
       page: page,
       lines: [scene],
       styleLabel: userStyle,

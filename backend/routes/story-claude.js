@@ -1,7 +1,11 @@
 // routes/story-claude.js
 const Anthropic = require("@anthropic-ai/sdk");
 const { z } = require("zod");
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const fetch = (...a) => import("node-fetch").then(({ default: f }) => f(...a));
+const anthropic = new Anthropic({ 
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  fetch: fetch
+});
 const { getBook, getStorySoFar, getOutline, pushPage } = require("../store");
 
 const AuthorOutput = z.object({
